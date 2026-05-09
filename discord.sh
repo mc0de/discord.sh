@@ -54,6 +54,7 @@ General options:
   --webhook-url                  Specify the Discord webhook URL
   --dry-run                      Dry run, don't actually send message
   --version                      Print version information
+  --replace <key>                Delete previous message with this key, send new one, save its ID
 
 File options:
   --file <file>                  Send file <file>
@@ -140,6 +141,9 @@ while (( "$#" )); do
 
         --dry-run) is_dry=1; shift;;
         --tts) is_tts=1; shift;;
+
+        --replace=*) replace_key=${1/--replace=/''}; shift;;
+        --replace*) replace_key=${2}; shift; shift;;
         --version) print_version;;
 
         --webhook-url=*) webhook_url=${1/--webhook-url=/''}; shift;;
@@ -437,6 +441,26 @@ send()
         send_ok=$?
         [[ "${send_ok}" -ne 0 ]] && echo "fatal: curl failed with code ${send_ok}" && exit $send_ok
         exit 0;
+    fi
+
+    # replace mode: delete old message then post new one, saving the returned ID
+    if [[ -n "${replace_key}" ]]; then
+        local _id_file="${thisdir}/.discord_msg_${replace_key}"
+        if [[ -f "${_id_file}" ]]; then
+            local _old_id
+            _old_id=$(cat "${_id_file}")
+            curl -s -X DELETE "${webhook_url}/messages/${_old_id}" >/dev/null 2>&1
+            rm "${_id_file}"
+        fi
+        local _result
+        _result=$(curl -s -H "Content-Type: application/json" -H "Expect: application/json" \
+            -X POST "${webhook_url}?wait=true" -d "${_sendme}" 2>/dev/null)
+        send_ok=$?
+        [[ "${send_ok}" -ne 0 ]] && echo "fatal: curl failed with code ${send_ok}" && exit $send_ok
+        local _new_id
+        _new_id=$(echo "${_result}" | jq -r '.id // empty')
+        [[ -n "${_new_id}" ]] && echo "${_new_id}" > "${_id_file}"
+        exit 0
     fi
 
     # make the POST request and parse the results
