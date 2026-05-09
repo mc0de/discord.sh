@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-shopt -s lastpipe   # avoid subshell weirdness hopefully
+shopt -s lastpipe 2>/dev/null || true   # bash 4.2+ only, safe to skip
 shopt -so pipefail  # hopefully correctly get $? in substitution
 
 # check for jq
@@ -388,7 +388,7 @@ build() {
         [[ -z "${username}" ]] && \
         [[ -z "${avatar_url}" ]] && \
             echo "fatal: nothing to build" && exit 1
-    
+
     # if only specified modify but not username/avatar, exit with error
     [[ -n "${modify}" ]] && \
         [[ -z "${username}" ]] && \
@@ -509,7 +509,7 @@ send_file() {
         -F "payload_json=${_json}" \
         "${webhook_url}" >/dev/null 2>&1
 
-    # error checking 
+    # error checking
 
     sent_ok=$?
     [[ "${sent_ok}" -eq 0 ]] && exit 0
